@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+:root {
+  --primary: #0ea5e9; /* Sky 500 */
+  --secondary: #10b981; /* Emerald 500 */
+  --bg-main: #f8fafc; /* Slate 50 */
+}
+
+@theme {
+  --color-primary: #0ea5e9;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+body {
+  background-color: var(--bg-main);
+  font-family: 'Inter', system-ui, sans-serif;
+  color: #1e293b; /* Slate 800 */
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.dark body {
+  --bg-main: #0f172a; /* Slate 900 */
+  color: #f8fafc; /* Slate 50 */
+}
