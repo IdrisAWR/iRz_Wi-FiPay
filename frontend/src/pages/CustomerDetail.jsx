@@ -191,7 +191,7 @@ export default function CustomerDetail() {
                         <td className="p-4">
                           <div className="flex items-center justify-center gap-2">
                             <button 
-                              onClick={() => setReceiptData({ ...p, customerName: customer.name })}
+                              onClick={() => setReceiptData({ ...p, customerName: customer.name, customerPhone: customer.phone })}
                               className="text-primary dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 p-2 rounded-lg transition-colors"
                               title="Cetak Nota"
                             >

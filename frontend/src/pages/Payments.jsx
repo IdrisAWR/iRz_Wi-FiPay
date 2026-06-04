@@ -163,6 +163,7 @@ export default function Payments() {
     const paymentRecord = { 
         ...form, 
         customerName: selectedCust?.name,
+        customerPhone: selectedCust?.phone,
         amount: totalAmount,
         for_month: forMonthLabel,
         payment_code: paymentsToSubmit[0].payment_code // We can use the first code for the combined receipt

@@ -1,5 +1,5 @@
-import { Download, X, Wifi } from 'lucide-react';
-import { toJpeg } from 'html-to-image';
+import { Download, X, Wifi, MessageCircle } from 'lucide-react';
+import { toJpeg, toBlob } from 'html-to-image';
 
 export default function ReceiptModal({ receiptData, onClose }) {
   if (!receiptData) return null;
@@ -25,7 +25,80 @@ export default function ReceiptModal({ receiptData, onClose }) {
     }
   };
 
+  const handleSendWA = async () => {
+    const phone = receiptData.customerPhone || receiptData.customer?.phone;
+    
+    if (!phone) {
+      alert("Nomor telepon pelanggan tidak tersedia.");
+      return;
+    }
+
+    const nominal = formatRupiah(receiptData.amount);
+    const month = formatBulan(receiptData.for_month);
+    const name = receiptData.customerName || receiptData.customer?.name;
+    const refCode = receiptData.payment_code ? `\n*Kode Ref:* ${receiptData.payment_code}` : '';
+
+    const text = `Terima kasih atas pembayaran tagihan WiFi Anda untuk bulan *${month}*.
+*Total:* ${nominal}${refCode}
+*Status:* LUNAS
+
+Simpan nota ini sebagai bukti pembayaran yang sah.`;
+
+    const element = document.getElementById('receipt-download-area');
+    if (!element) return;
+
+    try {
+      // Buat gambar dalam bentuk Blob
+      const blob = await toBlob(element, { 
+        quality: 1.0,
+        backgroundColor: '#ffffff',
+        pixelRatio: 2
+      });
+
+      const file = new File([blob], `Nota_${name.replace(/\s+/g, '_')}_${month}.png`, { type: 'image/png' });
+
+      // 1. Coba gunakan Web Share API (Berjalan sangat baik di Mobile / HP)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Nota Pembayaran',
+          text: text
+        });
+        return; // Jika berhasil share via HP, tidak perlu buka tab wa.me baru
+      }
+
+      // 2. Jika di Desktop (Web Share tidak mendukung file), salin gambar ke Clipboard
+      try {
+        await navigator.clipboard.write([
+          new window.ClipboardItem({
+            'image/png': blob
+          })
+        ]);
+        alert("Gambar nota telah disalin ke clipboard! Silakan 'Paste' (Ctrl+V) di kolom chat WhatsApp.");
+      } catch (clipboardErr) {
+        console.warn("Gagal menyalin ke clipboard", clipboardErr);
+      }
+
+      // 3. Buka tab WA
+      const encodedText = encodeURIComponent(text);
+      let formattedPhone = phone.replace(/\D/g, '');
+      if (formattedPhone.startsWith('0')) {
+        formattedPhone = '62' + formattedPhone.substring(1);
+      }
+      window.open(`https://wa.me/${formattedPhone}?text=${encodedText}`, '_blank');
+      
+    } catch (error) {
+      console.error("Gagal memproses gambar nota", error);
+      alert("Gagal memproses gambar nota untuk dikirim.");
+    }
+  };
+
   const formatRupiah = (number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(number);
+  const formatBulan = (bulan) => {
+    const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const [year, month] = bulan.split('-');
+    return `${monthNames[parseInt(month, 10) - 1]} ${year}`;
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -89,17 +162,23 @@ export default function ReceiptModal({ receiptData, onClose }) {
           <div className="text-center pt-8 text-xs text-gray-400 font-medium relative z-10">
             <p>Terima kasih atas pembayaran Anda.</p>
             <p className="mt-1">Simpan nota ini sebagai bukti pembayaran yang sah.</p>
-            <p className="mt-2 text-gray-300">Cek keaslian: {window.location.origin}/#/verify</p>
+            {/* <p className="mt-2 text-gray-300">Cek keaslian: {window.location.origin}/#/verify</p> */}
           </div>
         </div>
 
         {/* Footer Actions - Not included in image */}
-        <div className="p-6 bg-gray-50 dark:bg-gray-900/50 flex justify-center gap-3 border-t border-gray-100 dark:border-gray-700">
+        <div className="p-6 bg-gray-50 dark:bg-gray-900/50 flex flex-col sm:flex-row justify-center gap-3 border-t border-gray-100 dark:border-gray-700">
           <button 
             onClick={handleDownloadImage}
-            className="w-full bg-primary hover:bg-blue-600 text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 transition-transform active:scale-95 shadow-md shadow-blue-200 dark:shadow-none"
+            className="flex-1 bg-primary hover:bg-blue-600 text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 transition-transform active:scale-95 shadow-md shadow-blue-200 dark:shadow-none"
           >
-            <Download size={20} /> Unduh Nota (Gambar JPEG)
+            <Download size={20} /> Unduh Nota
+          </button>
+          <button 
+            onClick={handleSendWA}
+            className="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 transition-transform active:scale-95 shadow-md shadow-green-200 dark:shadow-none"
+          >
+            <MessageCircle size={20} /> Kirim ke WA
           </button>
         </div>
       </div>
