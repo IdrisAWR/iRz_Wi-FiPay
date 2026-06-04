@@ -17,6 +17,7 @@ export default function Reports() {
   const [yearlyCurrentPage, setYearlyCurrentPage] = useState(1);
   const [yearlySearchTerm, setYearlySearchTerm] = useState('');
   const [monthlySearchTerm, setMonthlySearchTerm] = useState('');
+  const [waModalData, setWaModalData] = useState(null);
   const yearlyItemsPerPage = 20;
 
   useEffect(() => {
@@ -191,7 +192,7 @@ Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
     XLSX.writeFile(wb, `Laporan_Tahunan_iRz_WiFi_${year}.xlsx`);
   };
 
-  const handleSendWA = (customer, arrears) => {
+  const openWaModal = (customer) => {
     if (!customer.phone) {
       alert(`Nomor telepon untuk pelanggan ${customer.name} belum diisi.`);
       return;
@@ -208,20 +209,37 @@ Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
 
       if (targetDateStr >= activeDateStr && targetMonth <= currentMonth) {
         if (!customer.paid_months.includes(targetMonth)) {
-          unpaidMonths.push(monthNames[i-1]);
+          unpaidMonths.push({
+            name: monthNames[i-1],
+            targetMonth
+          });
         }
       }
     }
 
-    const totalNominal = formatRupiah(arrears * customer.monthly_fee);
-    const listBulan = unpaidMonths.join(', ');
-    const currentMonthStr = new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+    if (unpaidMonths.length === 0) {
+      alert('Tidak ada tunggakan untuk pelanggan ini di tahun ini.');
+      return;
+    }
 
-    const text = `Halo Kak ${customer.name}, ini adalah pesan dari admin iRz Wi-Fi.
+    setWaModalData({
+      customer,
+      unpaidMonths,
+      selectedMonths: unpaidMonths.map(m => m.targetMonth)
+    });
+  };
 
-Terdapat tagihan internet WiFi bulan ${currentMonthStr} yang belum dibayarkan sebanyak ${arrears} bulan (${listBulan} ${year}) dengan total tagihan sebesar *${totalNominal}*.
+  const handleSendWASelected = () => {
+    if (!waModalData) return;
+    const { customer, unpaidMonths, selectedMonths } = waModalData;
+    
+    const sortedSelected = unpaidMonths.filter(m => selectedMonths.includes(m.targetMonth));
+    const listBulan = sortedSelected.map(m => m.name).join(', ');
+    const totalNominal = formatRupiah(selectedMonths.length * customer.monthly_fee);
+    
+    const text = `Terdapat tagihan internet WiFi bulan ${listBulan} ${year} yang belum dibayarkan sebesar *${totalNominal}*.
 
-Mohon untuk segera melakukan pembayaran agar koneksi internet tetap lancar. Terima kasih! 🙏`;
+Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
 
     const encodedText = encodeURIComponent(text);
     
@@ -231,6 +249,7 @@ Mohon untuk segera melakukan pembayaran agar koneksi internet tetap lancar. Teri
     }
 
     window.open(`https://wa.me/${phone}?text=${encodedText}`, '_blank');
+    setWaModalData(null);
   };
 
   const filteredYearlyData = yearlyData.filter(c => 
@@ -491,9 +510,9 @@ Mohon untuk segera melakukan pembayaran agar koneksi internet tetap lancar. Teri
                                 <div className="flex items-center justify-end gap-3">
                                   <span className="text-red-600 font-bold">{arrears} bln ({formatRupiah(arrears * c.monthly_fee)})</span>
                                   <button
-                                    onClick={() => handleSendWA(c, arrears)}
+                                    onClick={() => openWaModal(c)}
                                     className="p-1.5 bg-green-100 text-green-600 hover:bg-green-600 hover:text-white rounded-lg transition-colors"
-                                    title="Kirim Tagihan via WA"
+                                    title="Pilih Bulan & Kirim Tagihan via WA"
                                   >
                                     <MessageCircle size={18} />
                                   </button>
@@ -538,6 +557,58 @@ Mohon untuk segera melakukan pembayaran agar koneksi internet tetap lancar. Teri
         </div>
       )}
       
+      {waModalData && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full shadow-lg overflow-hidden">
+            <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+              <h3 className="font-bold text-gray-800 dark:text-white">Kirim Tagihan WA</h3>
+              <button onClick={() => setWaModalData(null)} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                <XCircle size={20} />
+              </button>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Pilih bulan yang ingin ditagihkan kepada <strong>{waModalData.customer.name}</strong>:
+              </p>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {waModalData.unpaidMonths.map(m => (
+                  <label key={m.targetMonth} className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                      checked={waModalData.selectedMonths.includes(m.targetMonth)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setWaModalData({...waModalData, selectedMonths: [...waModalData.selectedMonths, m.targetMonth]});
+                        } else {
+                          setWaModalData({...waModalData, selectedMonths: waModalData.selectedMonths.filter(sm => sm !== m.targetMonth)});
+                        }
+                      }}
+                    />
+                    <span className="text-gray-800 dark:text-gray-200 font-medium">Bulan {m.name} {year}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 flex justify-end gap-3 border-t border-gray-100 dark:border-gray-700">
+              <button 
+                onClick={() => setWaModalData(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={handleSendWASelected}
+                disabled={waModalData.selectedMonths.length === 0}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg flex items-center gap-2 transition-colors"
+              >
+                <MessageCircle size={16} /> Kirim Pesan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ReceiptModal receiptData={receiptData} onClose={() => setReceiptData(null)} />
     </div>
   );
