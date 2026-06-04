@@ -10,11 +10,13 @@ export default function Reports() {
   const [loading, setLoading] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
   const [activeTab, setActiveTab] = useState('bulanan');
+  const [bulananTab, setBulananTab] = useState('sudah');
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [yearlyData, setYearlyData] = useState([]);
   const [yearlyLoading, setYearlyLoading] = useState(false);
   const [yearlyCurrentPage, setYearlyCurrentPage] = useState(1);
   const [yearlySearchTerm, setYearlySearchTerm] = useState('');
+  const [monthlySearchTerm, setMonthlySearchTerm] = useState('');
   const yearlyItemsPerPage = 20;
 
   useEffect(() => {
@@ -137,6 +139,30 @@ export default function Reports() {
     return "Menunggak";
   };
 
+  const handleSendWAMonthly = (customer) => {
+    if (!customer.phone) {
+      alert(`Nomor telepon untuk pelanggan ${customer.name} belum diisi.`);
+      return;
+    }
+
+    const [y, m] = month.split('-');
+    const monthName = monthNames[parseInt(m, 10) - 1];
+    const nominal = formatRupiah(customer.monthly_fee);
+
+    const text = `Terdapat tagihan internet WiFi bulan ${monthName} ${y} yang belum dibayarkan sebesar *${nominal}*.
+
+Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
+
+    const encodedText = encodeURIComponent(text);
+    
+    let phone = customer.phone.replace(/\D/g, '');
+    if (phone.startsWith('0')) {
+      phone = '62' + phone.substring(1);
+    }
+
+    window.open(`https://wa.me/${phone}?text=${encodedText}`, '_blank');
+  };
+
   const handleExportYearly = () => {
     if (yearlyData.length === 0) {
       alert("Tidak ada data untuk diekspor pada tahun ini.");
@@ -217,6 +243,14 @@ Mohon untuk segera melakukan pembayaran agar koneksi internet tetap lancar. Teri
     yearlyCurrentPage * yearlyItemsPerPage
   );
 
+  const filteredPayments = report?.payments?.filter(p => 
+    p.customer?.name?.toLowerCase().includes(monthlySearchTerm.toLowerCase())
+  ) || [];
+
+  const filteredUnpaidCustomers = report?.unpaid_customers?.filter(c =>
+    c.name?.toLowerCase().includes(monthlySearchTerm.toLowerCase())
+  ) || [];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -241,16 +275,25 @@ Mohon untuk segera melakukan pembayaran agar koneksi internet tetap lancar. Teri
       </div>
       {activeTab === 'bulanan' && (
         <div className="space-y-6">
-          <div className="flex justify-end gap-4 mb-2">
-            <input 
-              type="month" 
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="flex-1 sm:flex-none px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white"
+          <div className="flex flex-col sm:flex-row justify-between gap-4 mb-2">
+            <input
+              type="text"
+              placeholder="Cari nama pelanggan..."
+              value={monthlySearchTerm}
+              onChange={(e) => setMonthlySearchTerm(e.target.value)}
+              className="flex-1 px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white max-w-md"
             />
-            <button onClick={handleExport} className="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors">
-              <Download size={20} /> Export Excel
-            </button>
+            <div className="flex justify-end gap-4">
+              <input 
+                type="month" 
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                className="flex-1 sm:flex-none px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white"
+              />
+              <button onClick={handleExport} className="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors">
+                <Download size={20} /> Export Excel
+              </button>
+            </div>
           </div>
 
           {loading ? (
@@ -297,39 +340,89 @@ Mohon untuk segera melakukan pembayaran agar koneksi internet tetap lancar. Teri
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-colors">
+            <div className="flex border-b border-gray-100 dark:border-gray-700">
+              <button 
+                onClick={() => setBulananTab('sudah')}
+                className={`flex-1 py-3 px-4 font-medium text-sm transition-colors ${bulananTab === 'sudah' ? 'text-primary dark:text-blue-400 border-b-2 border-primary dark:border-blue-400 bg-blue-50/50 dark:bg-blue-900/10' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}
+              >
+                Sudah Bayar ({report.sudah_bayar})
+              </button>
+              <button 
+                onClick={() => setBulananTab('belum')}
+                className={`flex-1 py-3 px-4 font-medium text-sm transition-colors ${bulananTab === 'belum' ? 'text-red-500 dark:text-red-400 border-b-2 border-red-500 dark:border-red-400 bg-red-50/50 dark:bg-red-900/10' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}
+              >
+                Belum Bayar ({report.belum_bayar})
+              </button>
+            </div>
+            
             <div className="overflow-x-auto">
-              <table className="w-full text-left whitespace-nowrap">
-                <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-sm">
-                  <tr>
-                    <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Tanggal</th>
-                    <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Pelanggan</th>
-                    <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Nominal</th>
-                    <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700 text-center">Cetak</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {report.payments.length === 0 ? (
-                    <tr><td colSpan="4" className="p-4 text-center text-gray-500 dark:text-gray-400">Belum ada pembayaran di bulan ini</td></tr>
-                  ) : (
-                    report.payments.map(p => (
-                      <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                        <td className="p-4 text-gray-800 dark:text-gray-200">{p.payment_date}</td>
-                        <td className="p-4 text-gray-800 dark:text-white font-medium">{p.customer?.name}</td>
-                        <td className="p-4 text-green-600 dark:text-green-400 font-medium">{formatRupiah(p.amount)}</td>
-                        <td className="p-4 text-center">
-                          <button 
-                            onClick={() => setReceiptData({ ...p, customerName: p.customer?.name })}
-                            className="text-primary dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 p-2 rounded-lg transition-colors"
-                            title="Cetak Nota"
-                          >
-                            <Printer size={18} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+              {bulananTab === 'sudah' ? (
+                <table className="w-full text-left whitespace-nowrap">
+                  <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-sm">
+                    <tr>
+                      <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Tanggal</th>
+                      <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Pelanggan</th>
+                      <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Nominal</th>
+                      <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700 text-center">Cetak</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                    {filteredPayments.length === 0 ? (
+                      <tr><td colSpan="4" className="p-4 text-center text-gray-500 dark:text-gray-400">Belum ada pembayaran di bulan ini atau tidak ada hasil pencarian</td></tr>
+                    ) : (
+                      filteredPayments.map(p => (
+                        <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                          <td className="p-4 text-gray-800 dark:text-gray-200">{p.payment_date}</td>
+                          <td className="p-4 text-gray-800 dark:text-white font-medium">{p.customer?.name}</td>
+                          <td className="p-4 text-green-600 dark:text-green-400 font-medium">{formatRupiah(p.amount)}</td>
+                          <td className="p-4 text-center">
+                            <button 
+                              onClick={() => setReceiptData({ ...p, customerName: p.customer?.name })}
+                              className="text-primary dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 p-2 rounded-lg transition-colors"
+                              title="Cetak Nota"
+                            >
+                              <Printer size={18} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="w-full text-left whitespace-nowrap">
+                  <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-sm">
+                    <tr>
+                      <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Pelanggan</th>
+                      <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">No. HP</th>
+                      <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Tagihan</th>
+                      <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700 text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                    {filteredUnpaidCustomers.length === 0 ? (
+                      <tr><td colSpan="4" className="p-4 text-center text-gray-500 dark:text-gray-400">Semua pelanggan aktif sudah membayar bulan ini atau tidak ada hasil pencarian</td></tr>
+                    ) : (
+                      filteredUnpaidCustomers.map(c => (
+                        <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                          <td className="p-4 text-gray-800 dark:text-white font-medium">{c.name}</td>
+                          <td className="p-4 text-gray-600 dark:text-gray-300">{c.phone || '-'}</td>
+                          <td className="p-4 text-red-600 dark:text-red-400 font-medium">{formatRupiah(c.monthly_fee)}</td>
+                          <td className="p-4 text-center">
+                            <button 
+                              onClick={() => handleSendWAMonthly(c)}
+                              className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 p-2 rounded-lg transition-colors flex items-center justify-center mx-auto gap-2 text-sm font-medium"
+                              title="Kirim Tagihan WA"
+                            >
+                              <MessageCircle size={16} /> WA
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </div>

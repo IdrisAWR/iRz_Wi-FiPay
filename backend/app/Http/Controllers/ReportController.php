@@ -13,22 +13,34 @@ class ReportController extends Controller
     {
         $month = $request->query('month', Carbon::now()->format('Y-m'));
         
-        $totalCustomers = Customer::count();
         $payments = Payment::where('for_month', $month)->with('customer')->get();
-        
         $sudahBayarCount = $payments->unique('customer_id')->count();
-        $belumBayarCount = max(0, $totalCustomers - $sudahBayarCount);
         
         $totalPendapatan = $payments->sum('amount');
+        
+        $paidCustomerIds = $payments->pluck('customer_id')->toArray();
+        $monthDate = $month . '-01';
+
+        $unpaidCustomersQuery = Customer::where('status', 'active')
+            ->whereNotIn('id', $paidCustomerIds)
+            ->get();
+            
+        $unpaidCustomers = $unpaidCustomersQuery->filter(function($customer) use ($monthDate) {
+            $activeDateStr = substr($customer->active_date, 0, 7) . '-01';
+            return $activeDateStr <= $monthDate;
+        })->values();
+
+        $eligibleTotalCustomersCount = $sudahBayarCount + $unpaidCustomers->count();
         
         // Simpel rekap, belum termasuk total tunggakan global (karena perlu logic cek per customer)
         return response()->json([
             'month' => $month,
-            'total_customers' => $totalCustomers,
+            'total_customers' => $eligibleTotalCustomersCount,
             'sudah_bayar' => $sudahBayarCount,
-            'belum_bayar' => $belumBayarCount,
+            'belum_bayar' => $unpaidCustomers->count(),
             'total_pendapatan' => $totalPendapatan,
-            'payments' => $payments
+            'payments' => $payments,
+            'unpaid_customers' => $unpaidCustomers
         ]);
     }
 
