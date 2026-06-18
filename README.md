@@ -64,4 +64,4 @@ npm run dev
 Jika Anda ingin menjalankan aplikasi ini di jaringan lokal (LAN/WiFi) agar bisa diakses dari HP, Anda harus melakukan proses *build* pada frontend dan menjalankan backend menggunakan IP lokal komputer (misalnya `192.168.1.xxx`). Panduan lengkapnya dapat Anda baca pada file `local_server_guide.md`.
 
 ---
-*Dibuat dengan ❤️ untuk kemudahan manajemen RT/RW Net & ISP Lokal.*
+*Dibuat oleh AwR untuk kemudahan manajemen RT/RW Net & ISP Lokal.*
