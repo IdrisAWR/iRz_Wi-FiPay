@@ -49,6 +49,13 @@ class PaymentController extends Controller
             'payment_code' => $validated['payment_code']
         ]);
 
+        // Auto-sync real-time transaction to Google Spreadsheet
+        try {
+            app(\App\Services\GoogleSheetsService::class)->appendPayment($payment);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Real-time Google Sheets auto-sync failed: " . $e->getMessage());
+        }
+
         return response()->json($payment->load('customer'), 201);
     }
 
@@ -65,6 +72,8 @@ class PaymentController extends Controller
         ]);
 
         $created = [];
+        $sheetsService = app(\App\Services\GoogleSheetsService::class);
+
         foreach ($validated['payments'] as $payData) {
             // Cek duplikasi saat sinkronisasi
             $exists = Payment::where('customer_id', $payData['customer_id'])
@@ -90,6 +99,13 @@ class PaymentController extends Controller
                 'payment_code' => $payData['payment_code']
             ]);
             
+            // Auto-sync real-time transaction row
+            try {
+                $sheetsService->appendPayment($payment);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error("Real-time Google Sheets auto-sync failed for payment code {$payment->payment_code}: " . $e->getMessage());
+            }
+
             $created[] = $payment;
         }
 

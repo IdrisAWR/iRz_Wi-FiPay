@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'google_drive' => [
+        'folder_id' => env('GOOGLE_DRIVE_FOLDER_ID'),
+        'spreadsheet_id' => env('GOOGLE_SPREADSHEET_ID'),
+        'service_account_json' => env('GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON'),
+        'auto_upload' => env('GOOGLE_DRIVE_AUTO_UPLOAD_ENABLED', true),
+    ],
+
 ];

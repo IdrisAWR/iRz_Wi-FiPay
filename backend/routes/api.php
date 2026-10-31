@@ -25,6 +25,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/reports/monthly', [ReportController::class, 'monthly']);
     Route::get('/reports/yearly', [ReportController::class, 'yearly']);
+    Route::post('/reports/upload-drive', [ReportController::class, 'uploadToDrive']);
+    Route::get('/reports/drive-status', [ReportController::class, 'getDriveStatus']);
+    Route::post('/reports/sync-sheets', [ReportController::class, 'syncSheets']);
     
     Route::apiResource('users', UserController::class)->except(['show', 'update']);
 });
