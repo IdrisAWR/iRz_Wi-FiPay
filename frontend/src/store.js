@@ -17,6 +17,9 @@ export const useStore = create((set) => ({
   isDarkMode: localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches),
   toggleDarkMode: () => set((state) => {
     const newMode = !state.isDarkMode;
+    const root = document.documentElement;
+    root.classList.add('theme-anim');
+    setTimeout(() => root.classList.remove('theme-anim'), 400);
     if (newMode) {
       document.documentElement.classList.add('dark');
       localStorage.setItem('theme', 'dark');
@@ -28,7 +31,6 @@ export const useStore = create((set) => ({
   })
 }));
 
-// Inisialisasi tema saat aplikasi dimuat pertama kali
 if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
   document.documentElement.classList.add('dark');
 } else {

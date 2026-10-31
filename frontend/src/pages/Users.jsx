@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
-import { UserPlus, Search, Trash2, Shield } from 'lucide-react';
+import { UserPlus, Search, Trash2 } from 'lucide-react';
+import { RowsSkeleton } from '../components/Skeleton';
 import { useStore } from '../store';
 
 export default function Users() {
@@ -73,26 +74,27 @@ export default function Users() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Manajemen Pengguna</h1>
           <p className="text-gray-500 dark:text-gray-400">Kelola akses admin dan user sistem</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
+          className="justify-center bg-primary hover:bg-[#014a85] text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
         >
           <UserPlus size={20} /> Tambah User
         </button>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-4 transition-colors">
+      <div>
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3 text-gray-400 dark:text-gray-500" size={20} />
           <input
             type="text"
             placeholder="Cari nama User..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white"
+            aria-label="Cari nama user"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -101,7 +103,7 @@ export default function Users() {
 
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-colors">
         <div className="overflow-x-auto">
-          <table className="w-full text-left whitespace-nowrap">
+          <table className="table-stack w-full text-left whitespace-nowrap">
             <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-sm">
               <tr>
                 <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Nama User</th>
@@ -112,38 +114,33 @@ export default function Users() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {loading ? (
-                <tr><td colSpan="4" className="p-4 text-center text-gray-500 dark:text-gray-400">Loading...</td></tr>
+                <RowsSkeleton colSpan={4} label="Memuat pengguna" />
               ) : filtered.length === 0 ? (
-                <tr><td colSpan="4" className="p-4 text-center text-gray-500 dark:text-gray-400">Tidak ada data User.</td></tr>
+                <tr><td colSpan="4" className="p-4 text-center text-gray-500 dark:text-gray-400">Tidak ada pengguna yang cocok.</td></tr>
               ) : (
                 filtered.map(u => (
                   <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-full text-blue-600 dark:text-blue-400">
-                          <Shield size={20} />
-                        </div>
-                        <p className="font-bold text-gray-800 dark:text-white">{u.name}</p>
-                      </div>
+                    <td data-primary className="p-4">
+                      <p className="font-semibold text-gray-900 dark:text-white">{u.name}</p>
                     </td>
-                    <td className="p-4">
-                      <p className="text-gray-600 dark:text-gray-300">{u.email}</p>
+                    <td data-label="Email" className="p-4">
+                      <p className="text-gray-700 dark:text-gray-300 break-all">{u.email}</p>
                     </td>
-                    <td className="p-4">
-                      <span className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-3 py-1 rounded-full text-xs font-bold">Administrator</span>
+                    <td data-label="Hak akses" className="p-4">
+                      <span className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-0.5 rounded-md text-xs font-semibold">Administrator</span>
                     </td>
-                    <td className="p-4 text-center">
+                    <td data-label="Aksi" className="p-4 text-right">
                       {currentUser?.id !== u.id && (
                         <button 
                           onClick={() => handleDelete(u.id)}
                           className="text-red-500 hover:text-red-700 dark:hover:text-red-400 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                          title="Hapus User"
+                          title="Hapus user" aria-label={`Hapus user ${u.name}`}
                         >
                           <Trash2 size={20} />
                         </button>
                       )}
                       {currentUser?.id === u.id && (
-                        <span className="text-xs font-bold text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded border dark:border-gray-700">Anda</span>
+                        <span className="text-xs font-bold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded border dark:border-gray-700">Anda</span>
                       )}
                     </td>
                   </tr>
@@ -155,8 +152,8 @@ export default function Users() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden transition-colors">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 modal-backdrop">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md modal-panel overflow-hidden transition-colors">
             <div className="p-4 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex justify-between items-center">
               <h2 className="text-lg font-bold text-gray-800 dark:text-white">Tambah User Baru</h2>
             </div>
@@ -175,7 +172,7 @@ export default function Users() {
               </div>
               <div className="pt-4 flex justify-end gap-3 border-t dark:border-gray-700 mt-4 pt-4">
                 <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 rounded-lg font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Batal</button>
-                <button type="submit" disabled={submitting} className="px-4 py-2 rounded-lg font-medium text-white bg-primary hover:bg-blue-600 transition-colors disabled:opacity-50">
+                <button type="submit" disabled={submitting} className="px-4 py-2 rounded-lg font-medium text-white bg-primary hover:bg-[#014a85] transition-colors disabled:opacity-50">
                   {submitting ? 'Menyimpan...' : 'Simpan User'}
                 </button>
               </div>

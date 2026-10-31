@@ -4,6 +4,7 @@ import api from '../api';
 import { ArrowLeft, User, MapPin, Calendar, CreditCard, DollarSign, Activity, Edit, Trash2, X, Printer } from 'lucide-react';
 import { db } from '../db';
 import ReceiptModal from '../components/ReceiptModal';
+import { Skeleton, RowsSkeleton } from '../components/Skeleton';
 
 export default function CustomerDetail() {
   const { id } = useParams();
@@ -80,14 +81,25 @@ export default function CustomerDetail() {
 
   const formatRupiah = (number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(number);
 
-  if (loading) return <div className="text-center py-12 text-gray-500">Loading data pelanggan...</div>;
+  if (loading) return (
+    <div role="status" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <span className="sr-only">Memuat data pelanggan</span>
+      <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 space-y-4">
+        <Skeleton className="h-6 w-2/3" />
+        {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+      </div>
+      <div className="lg:col-span-2 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <table className="w-full"><tbody><RowsSkeleton colSpan={1} rows={6} /></tbody></table>
+      </div>
+    </div>
+  );
   if (!customer) return <div className="text-center py-12 text-gray-500">Pelanggan tidak ditemukan.</div>;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link to="/customers" className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-600">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <Link to="/customers" aria-label="Kembali ke daftar pelanggan" className="grid place-items-center size-11 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-700 dark:text-gray-300">
             <ArrowLeft size={24} />
           </Link>
           <div>
@@ -97,16 +109,16 @@ export default function CustomerDetail() {
         </div>
         
         {navigator.onLine && (
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <button 
               onClick={() => setShowEditModal(true)}
-              className="bg-orange-100 text-orange-700 hover:bg-orange-200 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
+              className="flex-1 sm:flex-none justify-center bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
             >
               <Edit size={18} /> Edit
             </button>
             <button 
               onClick={handleDelete}
-              className="bg-red-100 text-red-700 hover:bg-red-200 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
+              className="flex-1 sm:flex-none justify-center bg-red-100 text-red-800 hover:bg-red-200 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
             >
               <Trash2 size={18} /> Hapus
             </button>
@@ -115,7 +127,6 @@ export default function CustomerDetail() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Info Pelanggan */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
             <div className="flex items-center gap-4 mb-6">
@@ -163,7 +174,6 @@ export default function CustomerDetail() {
           </div>
         </div>
 
-        {/* Histori Pembayaran */}
         <div className="lg:col-span-2">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden h-full transition-colors">
             <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
@@ -173,7 +183,7 @@ export default function CustomerDetail() {
             </div>
             {customer.payments && customer.payments.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="w-full text-left whitespace-nowrap">
+                <table className="table-stack w-full text-left whitespace-nowrap">
                   <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-sm">
                     <tr>
                       <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Bulan Tagihan</th>
@@ -185,22 +195,22 @@ export default function CustomerDetail() {
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                     {customer.payments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(p => (
                       <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                        <td className="p-4 font-bold text-gray-800 dark:text-white">{p.for_month}</td>
-                        <td className="p-4 text-gray-600 dark:text-gray-300">{p.payment_date}</td>
-                        <td className="p-4 text-green-600 dark:text-green-400 font-medium">{formatRupiah(p.amount)}</td>
-                        <td className="p-4">
-                          <div className="flex items-center justify-center gap-2">
+                        <td data-primary className="p-4 font-semibold text-gray-900 dark:text-white">{p.for_month}</td>
+                        <td data-label="Tanggal bayar" className="p-4 text-gray-700 dark:text-gray-300">{p.payment_date}</td>
+                        <td data-label="Nominal" className="p-4 text-green-800 dark:text-green-400 font-medium">{formatRupiah(p.amount)}</td>
+                        <td data-actions className="p-4">
+                          <div className="flex items-center justify-end gap-2 w-full">
                             <button 
                               onClick={() => setReceiptData({ ...p, customerName: customer.name, customerPhone: customer.phone })}
                               className="text-primary dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 p-2 rounded-lg transition-colors"
-                              title="Cetak Nota"
+                              title="Cetak nota" aria-label="Cetak nota"
                             >
                               <Printer size={18} />
                             </button>
                             <button 
                               onClick={() => handleDeletePayment(p.id)}
                               className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 p-2 rounded-lg transition-colors"
-                              title="Hapus Histori"
+                              title="Hapus histori" aria-label="Hapus histori pembayaran"
                             >
                               <Trash2 size={18} />
                             </button>
@@ -212,15 +222,13 @@ export default function CustomerDetail() {
                 </table>
               </div>
             ) : (
-              <div className="p-12 text-center text-gray-500 flex flex-col items-center">
-                <CreditCard size={48} className="text-gray-300 mb-4" />
-                <p>Belum ada histori pembayaran.</p>
+              <div className="p-8 text-center text-gray-600 dark:text-gray-400">
+                <p>Belum ada pembayaran untuk pelanggan ini.</p>
               </div>
             )}
             
-            {/* Pagination UI for Payments */}
             {customer.payments && customer.payments.length > itemsPerPage && (
-              <div className="p-4 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
+              <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white dark:bg-gray-800">
                 <span className="text-sm text-gray-500 dark:text-gray-400">
                   Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, customer.payments.length)} dari {customer.payments.length} data
                 </span>
@@ -246,10 +254,9 @@ export default function CustomerDetail() {
         </div>
       </div>
 
-      {/* Edit Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden transition-colors max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 modal-backdrop">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg modal-panel overflow-hidden transition-colors max-h-[90vh] flex flex-col">
             <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50">
               <h2 className="text-lg font-bold text-gray-800 dark:text-white">Edit Pelanggan</h2>
               <button onClick={() => setShowEditModal(false)} className="text-gray-500 dark:text-gray-400 hover:text-red-500 transition-colors">
@@ -296,7 +303,7 @@ export default function CustomerDetail() {
               </div>
               <div className="pt-4 border-t dark:border-gray-700 flex justify-end gap-3 mt-4">
                 <button type="button" onClick={() => setShowEditModal(false)} className="px-5 py-2 rounded-lg font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Batal</button>
-                <button type="submit" disabled={submitting} className="px-5 py-2 rounded-lg font-medium text-white bg-primary hover:bg-blue-600 transition-colors disabled:opacity-50">
+                <button type="submit" disabled={submitting} className="px-5 py-2 rounded-lg font-medium text-white bg-primary hover:bg-[#014a85] transition-colors disabled:opacity-50">
                   {submitting ? 'Menyimpan...' : 'Simpan Perubahan'}
                 </button>
               </div>

@@ -2,9 +2,10 @@ import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api';
 import { db } from '../db';
-import { Plus, Search, WifiOff, Wifi, X, FileDown, Upload } from 'lucide-react';
+import { Plus, Search, WifiOff, X, Upload } from 'lucide-react';
 import { useStore } from '../store';
 import * as XLSX from 'xlsx';
+import { RowsSkeleton } from '../components/Skeleton';
 
 export default function Customers() {
   const [customers, setCustomers] = useState([]);
@@ -139,7 +140,6 @@ export default function Customers() {
   const calculateTunggakan = (customer) => {
     if (!customer.active_date) return 0;
 
-    // Calculate months difference between active_date and current month
     const activeDate = new Date(customer.active_date);
     const currentDate = new Date();
 
@@ -180,36 +180,45 @@ export default function Customers() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Manajemen Pelanggan</h1>
-          <p className="text-gray-500 dark:text-gray-400">Kelola data pelanggan WiFi</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Pelanggan</h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            {filtered.length} pelanggan, {activeCount} aktif, {inactiveCount} nonaktif, {tunggakanCount} belum bayar
+          </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <button
             disabled={!isOnline}
             onClick={() => setShowImportModal(true)}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 disabled:opacity-50 transition-colors"
+            className="flex-1 sm:flex-none justify-center border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 px-4 py-2 rounded-lg font-medium flex items-center gap-2 disabled:opacity-50 transition-colors"
           >
-            <FileDown size={20} /> Import Excel
+            <Upload size={18} /> Import Excel
           </button>
           <button
             disabled={!isOnline}
             onClick={() => setShowModal(true)}
-            className="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 disabled:opacity-50 transition-colors"
+            className="flex-1 sm:flex-none justify-center bg-primary hover:bg-[#014a85] text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 disabled:opacity-50 transition-colors"
           >
-            <Plus size={20} /> Tambah Pelanggan
+            <Plus size={18} /> Tambah
           </button>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row items-center gap-4 transition-colors">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-3 text-gray-400 dark:text-gray-500" size={20} />
+      {!isOnline && (
+        <p role="status" className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-900 dark:text-amber-200 px-4 py-3 text-sm">
+          <WifiOff size={16} /> Sedang offline. Menampilkan data tersimpan; tambah dan import dinonaktifkan.
+        </p>
+      )}
+
+      <div className="flex flex-col sm:flex-row items-stretch gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-3 text-gray-500 dark:text-gray-400" size={20} />
           <input
-            type="text"
-            placeholder="Cari nama pelanggan..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white"
+            type="search"
+            aria-label="Cari nama pelanggan"
+            placeholder="Cari nama pelanggan"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
             value={search}
             onChange={e => {
               setSearch(e.target.value);
@@ -218,8 +227,9 @@ export default function Customers() {
           />
         </div>
         
-        <select 
-          className="w-full sm:w-auto px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-700"
+        <select
+          aria-label="Urutkan"
+          className="w-full sm:w-auto px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-700"
           value={sortBy}
           onChange={e => {
             setSortBy(e.target.value);
@@ -231,60 +241,60 @@ export default function Customers() {
           <option value="status">Urutkan: Status</option>
           <option value="tunggakan">Urutkan: Tunggakan Terbesar</option>
         </select>
-
-        <div className={`w-full sm:w-auto px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium ${isOnline ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
-          {isOnline ? <><Wifi size={16} /> Online Mode</> : <><WifiOff size={16} /> Offline Mode (Cache)</>}
-        </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-colors">
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left whitespace-nowrap">
-            <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-sm">
+          <table className="table-stack w-full text-left whitespace-nowrap">
+            <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400 text-sm">
               <tr>
-                <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Nama ({filtered.length})</th>
-                <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Status (Aktif: {activeCount}, Inaktif: {inactiveCount})</th>
-                <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Paket & IP</th>
-                <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700 text-center">Tagihan (Belum Bayar: {tunggakanCount})</th>
-                <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700 text-center">Aksi</th>
+                <th className="p-4 font-medium border-b border-gray-200 dark:border-gray-700">Nama</th>
+                <th className="p-4 font-medium border-b border-gray-200 dark:border-gray-700">Status</th>
+                <th className="p-4 font-medium border-b border-gray-200 dark:border-gray-700">Paket & IP</th>
+                <th className="p-4 font-medium border-b border-gray-200 dark:border-gray-700">Tagihan</th>
+                <th className="p-4 font-medium border-b border-gray-200 dark:border-gray-700 text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
-                <tr><td colSpan="5" className="p-4 text-center text-gray-500 dark:text-gray-400">Loading...</td></tr>
+                <RowsSkeleton colSpan={5} label="Memuat pelanggan" />
               ) : filtered.length === 0 ? (
-                <tr><td colSpan="5" className="p-4 text-center text-gray-500 dark:text-gray-400">Tidak ada data.</td></tr>
+                <tr>
+                  <td colSpan="5" className="p-8 text-center text-gray-600 dark:text-gray-400">
+                    {search ? `Tidak ada pelanggan bernama "${search}".` : 'Belum ada pelanggan. Tambah satu atau import dari Excel.'}
+                  </td>
+                </tr>
               ) : (
                 filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(c => {
                   const tunggakan = calculateTunggakan(c);
                   return (
                     <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                      <td className="p-4">
-                        <p className="font-bold text-gray-800 dark:text-white">{c.name}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{c.phone || '-'}</p>
+                      <td data-primary className="p-4">
+                        <p className="font-semibold text-gray-900 dark:text-white">{c.name}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{c.phone || '-'}</p>
                       </td>
-                      <td className="p-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${c.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
-                          {c.status.toUpperCase()}
+                      <td data-label="Status" className="p-4">
+                        <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${c.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'}`}>
+                          {c.status === 'active' ? 'Aktif' : 'Nonaktif'}
                         </span>
                       </td>
-                      <td className="p-4">
-                        <p className="text-gray-800 dark:text-gray-200 font-medium">{c.package_name}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">IP: {c.ip_address || 'Belum diset'}</p>
+                      <td data-label="Paket" className="p-4">
+                        <p className="text-gray-900 dark:text-gray-200 font-medium">{c.package_name}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">IP: {c.ip_address || 'Belum diset'}</p>
                       </td>
-                      <td className="p-4 text-center">
+                      <td data-label="Tagihan" className="p-4">
                         {tunggakan > 0 ? (
-                          <span className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-3 py-1 rounded-lg font-bold text-sm">
-                            Belum Bayar {tunggakan} Bulan
+                          <span className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 px-2 py-0.5 rounded-md font-semibold text-sm">
+                            Belum bayar {tunggakan} bulan
                           </span>
                         ) : (
-                          <span className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-3 py-1 rounded-lg font-bold text-sm">
+                          <span className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 rounded-md font-semibold text-sm">
                             Lunas
                           </span>
                         )}
                       </td>
-                      <td className="p-4 text-center">
-                        <Link to={`/customers/${c.id}`} className="text-primary dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium hover:underline">
+                      <td data-actions className="p-4 text-right">
+                        <Link to={`/customers/${c.id}`} className="inline-flex items-center justify-center min-h-11 px-3 text-primary dark:text-sky-300 font-medium rounded-lg border border-gray-300 dark:border-gray-600 md:border-transparent hover:bg-gray-100 dark:hover:bg-gray-700">
                           Detail
                         </Link>
                       </td>
@@ -295,9 +305,8 @@ export default function Customers() {
             </tbody>
           </table>
         </div>
-        {/* Pagination UI */}
         {filtered.length > itemsPerPage && (
-          <div className="p-4 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <span className="text-sm text-gray-500 dark:text-gray-400">
               Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filtered.length)} dari {filtered.length} data
             </span>
@@ -321,10 +330,9 @@ export default function Customers() {
         )}
       </div>
 
-      {/* Modal Tambah Pelanggan */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden transition-colors">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 modal-backdrop">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg modal-panel overflow-hidden transition-colors">
             <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50">
               <h2 className="text-lg font-bold text-gray-800 dark:text-white">Tambah Pelanggan Baru</h2>
               <button onClick={() => setShowModal(false)} className="text-gray-500 dark:text-gray-400 hover:text-red-500 transition-colors">
@@ -362,7 +370,7 @@ export default function Customers() {
               </div>
               <div className="pt-4 border-t dark:border-gray-700 flex justify-end gap-3">
                 <button type="button" onClick={() => setShowModal(false)} className="px-5 py-2 rounded-lg font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Batal</button>
-                <button type="submit" disabled={submitting} className="px-5 py-2 rounded-lg font-medium text-white bg-primary hover:bg-blue-600 transition-colors disabled:opacity-50">
+                <button type="submit" disabled={submitting} className="px-5 py-2 rounded-lg font-medium text-white bg-primary hover:bg-[#014a85] transition-colors disabled:opacity-50">
                   {submitting ? 'Menyimpan...' : 'Simpan Pelanggan'}
                 </button>
               </div>
@@ -371,10 +379,9 @@ export default function Customers() {
         </div>
       )}
 
-      {/* Modal Import Pelanggan */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden transition-colors flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 modal-backdrop">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-4xl modal-panel overflow-hidden transition-colors flex flex-col max-h-[90vh]">
             <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50">
               <h2 className="text-lg font-bold text-gray-800 dark:text-white">Import Data Pelanggan</h2>
               <button onClick={() => { setShowImportModal(false); setImportData([]); if(fileInputRef.current) fileInputRef.current.value = ''; }} className="text-gray-500 dark:text-gray-400 hover:text-red-500 transition-colors">

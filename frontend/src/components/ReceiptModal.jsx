@@ -12,7 +12,7 @@ export default function ReceiptModal({ receiptData, onClose }) {
       const dataUrl = await toJpeg(element, { 
         quality: 1.0,
         backgroundColor: '#ffffff',
-        pixelRatio: 2 // High resolution
+        pixelRatio: 2
       });
       
       const link = document.createElement('a');
@@ -48,7 +48,6 @@ Simpan nota ini sebagai bukti pembayaran yang sah.`;
     if (!element) return;
 
     try {
-      // Buat gambar dalam bentuk Blob
       const blob = await toBlob(element, { 
         quality: 1.0,
         backgroundColor: '#ffffff',
@@ -57,17 +56,17 @@ Simpan nota ini sebagai bukti pembayaran yang sah.`;
 
       const file = new File([blob], `Nota_${name.replace(/\s+/g, '_')}_${month}.png`, { type: 'image/png' });
 
-      // 1. Coba gunakan Web Share API (Berjalan sangat baik di Mobile / HP)
+      // Web Share API dulu: di HP bisa membagikan file langsung ke WhatsApp.
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
           title: 'Nota Pembayaran',
           text: text
         });
-        return; // Jika berhasil share via HP, tidak perlu buka tab wa.me baru
+        return;
       }
 
-      // 2. Jika di Desktop (Web Share tidak mendukung file), salin gambar ke Clipboard
+      // Desktop tidak bisa membagikan file, jadi gambar disalin ke clipboard.
       try {
         await navigator.clipboard.write([
           new window.ClipboardItem({
@@ -79,7 +78,6 @@ Simpan nota ini sebagai bukti pembayaran yang sah.`;
         console.warn("Gagal menyalin ke clipboard", clipboardErr);
       }
 
-      // 3. Buka tab WA
       const encodedText = encodeURIComponent(text);
       let formattedPhone = phone.replace(/\D/g, '');
       if (formattedPhone.startsWith('0')) {
@@ -101,8 +99,8 @@ Simpan nota ini sebagai bukti pembayaran yang sah.`;
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transition-colors">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 modal-backdrop">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md modal-panel overflow-hidden transition-colors">
         {/* Header - Not included in image */}
         <div className="p-4 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700">
           <h2 className="text-lg font-bold text-gray-800 dark:text-white">Preview Nota</h2>
@@ -113,12 +111,9 @@ Simpan nota ini sebagai bukti pembayaran yang sah.`;
         
         {/* Receipt Content - This exact view will be downloaded as image */}
         <div id="receipt-download-area" className="p-8 space-y-6 bg-white relative">
-          {/* Watermark / Decoration */}
-          <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-br from-primary/10 to-blue-50/10 rounded-b-[40px] z-0"></div>
-          
           <div className="text-center pb-6 border-b-2 border-dashed border-gray-200 relative z-10">
             <div className="flex justify-center mb-3">
-              <div className="bg-primary text-white p-3 rounded-2xl shadow-lg shadow-blue-200 flex items-center justify-center">
+              <div className="bg-primary text-white p-3 rounded-2xl flex items-center justify-center">
                 <Wifi size={48} />
               </div>
             </div>
@@ -153,7 +148,7 @@ Simpan nota ini sebagai bukti pembayaran yang sah.`;
           </div>
           
           <div className="pt-2 relative z-10">
-            <div className="bg-primary text-white rounded-2xl p-5 shadow-lg shadow-blue-200 flex justify-between items-center">
+            <div className="bg-primary text-white rounded-2xl p-5 flex justify-between items-center">
               <span className="font-medium opacity-90">Total Tagihan</span>
               <span className="text-2xl font-black">{formatRupiah(receiptData.amount)}</span>
             </div>
@@ -162,7 +157,6 @@ Simpan nota ini sebagai bukti pembayaran yang sah.`;
           <div className="text-center pt-8 text-xs text-gray-400 font-medium relative z-10">
             <p>Terima kasih atas pembayaran Anda.</p>
             <p className="mt-1">Simpan nota ini sebagai bukti pembayaran yang sah.</p>
-            {/* <p className="mt-2 text-gray-300">Cek keaslian: {window.location.origin}/#/verify</p> */}
           </div>
         </div>
 
@@ -170,7 +164,7 @@ Simpan nota ini sebagai bukti pembayaran yang sah.`;
         <div className="p-6 bg-gray-50 dark:bg-gray-900/50 flex flex-col sm:flex-row justify-center gap-3 border-t border-gray-100 dark:border-gray-700">
           <button 
             onClick={handleDownloadImage}
-            className="flex-1 bg-primary hover:bg-blue-600 text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 transition-transform active:scale-95 shadow-md shadow-blue-200 dark:shadow-none"
+            className="flex-1 bg-primary hover:bg-[#014a85] text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 transition-transform active:scale-95 shadow-md shadow-blue-200 dark:shadow-none"
           >
             <Download size={20} /> Unduh Nota
           </button>

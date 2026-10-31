@@ -16,18 +16,13 @@ export default defineConfig({
         name: 'WifiPay - Pembayaran WiFi Bulanan',
         short_name: 'WifiPay',
         description: 'Aplikasi pencatatan pembayaran WiFi bulanan offline-first.',
-        theme_color: '#0ea5e9',
+        lang: 'id',
+        theme_color: '#0166bb',
+        background_color: '#ffffff',
         icons: [
-          {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          }
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'pwa-maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ]
       }
     })

@@ -2,8 +2,8 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense, useEffect, useState } from 'react';
 
 import Layout from './components/Layout';
+import { PageSkeleton } from './components/Skeleton';
 
-// Lazy loading komponen halaman
 const Login = lazy(() => import('./pages/Login'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Customers = lazy(() => import('./pages/Customers'));
@@ -33,7 +33,6 @@ function App() {
 
   return (
     <HashRouter>
-      {/* Network Status Indicator */}
       {!isOnline && (
         <div className="bg-red-500 text-white text-center py-2 text-sm font-semibold fixed top-0 w-full z-50">
           Anda sedang OFFLINE. Data akan disinkronisasi saat koneksi kembali.
@@ -41,11 +40,8 @@ function App() {
       )}
       <div className={!isOnline ? "mt-8" : ""}>
         <Suspense fallback={
-          <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors">
-            <div className="text-center">
-              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-500 dark:text-gray-400 font-medium">Memuat halaman...</p>
-            </div>
+          <div className="min-h-dvh bg-gray-50 dark:bg-slate-900 p-4 md:p-8">
+            <PageSkeleton />
           </div>
         }>
           <Routes>

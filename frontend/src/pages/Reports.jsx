@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
-import { Download, Printer, Users, CheckCircle, XCircle, DollarSign, MessageCircle } from 'lucide-react';
+import { Download, Printer, CheckCircle, XCircle, MessageCircle, CloudUpload, ExternalLink, CheckCircle2, AlertCircle, FileSpreadsheet, RefreshCw } from 'lucide-react';
+import { CardsSkeleton, RowsSkeleton } from '../components/Skeleton';
 import ReceiptModal from '../components/ReceiptModal';
 import * as XLSX from 'xlsx';
 
@@ -18,7 +19,69 @@ export default function Reports() {
   const [yearlySearchTerm, setYearlySearchTerm] = useState('');
   const [monthlySearchTerm, setMonthlySearchTerm] = useState('');
   const [waModalData, setWaModalData] = useState(null);
+  const [uploadingDrive, setUploadingDrive] = useState(false);
+  const [syncingSheets, setSyncingSheets] = useState(false);
+  const [driveStatus, setDriveStatus] = useState(null);
+  const [driveResult, setDriveResult] = useState(null);
   const yearlyItemsPerPage = 20;
+
+  useEffect(() => {
+    fetchDriveStatus();
+  }, []);
+
+  const fetchDriveStatus = async () => {
+    try {
+      const res = await api.get('/reports/drive-status');
+      setDriveStatus(res.data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSyncSheets = async () => {
+    setSyncingSheets(true);
+    setDriveResult(null);
+    try {
+      const res = await api.post('/reports/sync-sheets');
+      setDriveResult({
+        isError: false,
+        message: res.data.message || 'Semua transaksi berhasil disinkronkan ke Google Spreadsheet!',
+        link: res.data.spreadsheet_link
+      });
+      fetchDriveStatus();
+    } catch (error) {
+      console.error(error);
+      const msg = error.response?.data?.message || 'Gagal menyinkronkan data ke Google Sheets.';
+      setDriveResult({
+        isError: true,
+        message: msg
+      });
+    } finally {
+      setSyncingSheets(false);
+    }
+  };
+
+  const handleUploadDrive = async () => {
+    setUploadingDrive(true);
+    setDriveResult(null);
+    try {
+      const res = await api.post('/reports/upload-drive', { month });
+      setDriveResult({
+        isError: false,
+        message: res.data.message || `Laporan ${month} berhasil diunggah ke Google Drive!`,
+        link: res.data.data?.view_link
+      });
+    } catch (error) {
+      console.error(error);
+      const msg = error.response?.data?.message || 'Gagal mengunggah laporan ke Google Drive.';
+      setDriveResult({
+        isError: true,
+        message: msg
+      });
+    } finally {
+      setUploadingDrive(false);
+    }
+  };
 
   useEffect(() => {
     if (activeTab === 'bulanan') {
@@ -56,6 +119,11 @@ export default function Reports() {
   const formatRupiah = (number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(number);
   };
+  const formatBulan = (bulan) => {
+    const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const [year, month] = bulan.split('-');
+    return `${monthNames[parseInt(month, 10) - 1]} ${year}`;
+  };
 
   const handleExport = () => {
     if (!report || report.payments.length === 0) {
@@ -70,10 +138,8 @@ export default function Reports() {
       'Nominal': p.amount
     }));
 
-    // Add spacing
     dataToExport.push({ 'Tanggal': '', 'Pelanggan': '', 'Paket': '', 'Nominal': '' });
     
-    // Add summary rows
     dataToExport.push({ 'Tanggal': 'RINGKASAN', 'Pelanggan': '', 'Paket': '', 'Nominal': '' });
     dataToExport.push({ 'Tanggal': 'Total Pendapatan', 'Pelanggan': '', 'Paket': '', 'Nominal': report.total_pendapatan });
     dataToExport.push({ 'Tanggal': 'Total Pelanggan', 'Pelanggan': '', 'Paket': '', 'Nominal': report.total_customers });
@@ -93,7 +159,7 @@ export default function Reports() {
     const targetMonth = `${year}-${monthStr}`;
     
     if (customer.paid_months.includes(targetMonth)) {
-      return <span className="text-green-500 font-bold text-lg" title="Lunas">✅</span>;
+      return <CheckCircle2 size={18} className="inline text-green-700 dark:text-green-400" aria-label="Lunas" />;
     }
 
     const targetDateStr = `${targetMonth}-01`;
@@ -146,13 +212,16 @@ export default function Reports() {
       return;
     }
 
-    const [y, m] = month.split('-');
-    const monthName = monthNames[parseInt(m, 10) - 1];
-    const nominal = formatRupiah(customer.monthly_fee);
+    const formattedMonth = formatBulan(month);
+    const totalNominal = formatRupiah(customer.monthly_fee);
 
-    const text = `Terdapat tagihan internet WiFi bulan ${monthName} ${y} yang belum dibayarkan sebesar *${nominal}*.
+    const text = `Mohon untuk segera melakukan pembayaran WiFi bulan ${formattedMonth} yang belum dibayarkan sebesar *${totalNominal}* Terimakasih🙏
+*INFORMASI:* 
+WiFi akan otomatis OFF/MATI apabila tidak ada konfirmasi lebih lanjut dan ada tunggakan lebih dari 2 bulan, Terimakasih.
 
-Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
+Pembayaran via transfer bisa ke
+BCA : 8940485445
+an. Nur asih apriliana`;
 
     const encodedText = encodeURIComponent(text);
     
@@ -233,13 +302,16 @@ Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
     if (!waModalData) return;
     const { customer, unpaidMonths, selectedMonths } = waModalData;
     
-    const sortedSelected = unpaidMonths.filter(m => selectedMonths.includes(m.targetMonth));
-    const listBulan = sortedSelected.map(m => m.name).join(', ');
+    const selectedMonthNames = selectedMonths.sort().map(m => formatBulan(m)).join(', ');
     const totalNominal = formatRupiah(selectedMonths.length * customer.monthly_fee);
     
-    const text = `Terdapat tagihan internet WiFi bulan ${listBulan} ${year} yang belum dibayarkan sebesar *${totalNominal}*.
+    const text = `Mohon untuk segera melakukan pembayaran WiFi bulan ${selectedMonthNames} yang belum dibayarkan sebesar *${totalNominal}* Terimakasih🙏
+*INFORMASI:* 
+WiFi akan otomatis OFF/MATI apabila tidak ada konfirmasi lebih lanjut dan ada tunggakan lebih dari 2 bulan, Terimakasih.
 
-Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
+Pembayaran via transfer bisa ke
+BCA : 1234567890
+an. qwertyuio`;
 
     const encodedText = encodeURIComponent(text);
     
@@ -274,19 +346,19 @@ Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Laporan Keuangan</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Laporan Keuangan</h1>
           <p className="text-gray-500 dark:text-gray-400">Rekap pembayaran pelanggan WiFi</p>
         </div>
-        <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+        <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-full sm:w-auto">
           <button 
             onClick={() => setActiveTab('bulanan')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'bulanan' ? 'bg-white dark:bg-gray-700 shadow text-primary dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+            aria-pressed={activeTab === 'bulanan'} className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'bulanan' ? 'bg-white dark:bg-gray-700 shadow text-primary dark:text-white' : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100'}`}
           >
             Bulanan
           </button>
           <button 
             onClick={() => setActiveTab('tahunan')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'tahunan' ? 'bg-white dark:bg-gray-700 shadow text-primary dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+            aria-pressed={activeTab === 'tahunan'} className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'tahunan' ? 'bg-white dark:bg-gray-700 shadow text-primary dark:text-white' : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100'}`}
           >
             Tahunan
           </button>
@@ -297,66 +369,85 @@ Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
           <div className="flex flex-col sm:flex-row justify-between gap-4 mb-2">
             <input
               type="text"
-              placeholder="Cari nama pelanggan..."
+              placeholder="Cari nama pelanggan"
               value={monthlySearchTerm}
               onChange={(e) => setMonthlySearchTerm(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white max-w-md"
+              aria-label="Cari nama pelanggan" className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white sm:max-w-md"
             />
-            <div className="flex justify-end gap-4">
+            <div className="flex flex-wrap gap-2">
               <input 
                 type="month" 
                 value={month}
                 onChange={(e) => setMonth(e.target.value)}
-                className="flex-1 sm:flex-none px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white"
+                aria-label="Bulan laporan" className="flex-1 sm:flex-none px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
               />
-              <button onClick={handleExport} className="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors">
-                <Download size={20} /> Export Excel
+              <button onClick={handleExport} className="bg-primary hover:bg-[#014a85] text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors">
+                <Download size={18} /> Export Excel
               </button>
+              <button 
+                onClick={handleSyncSheets} 
+                disabled={syncingSheets} 
+                className="border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
+                title="Sinkronkan seluruh transaksi real-time ke Google Spreadsheet"
+              >
+                {syncingSheets ? <RefreshCw className="animate-spin" size={18} /> : <FileSpreadsheet size={18} />}
+                {syncingSheets ? 'Menyinkronkan…' : 'Sync ke Google Sheet'}
+              </button>
+              {driveStatus?.spreadsheet_link && (
+                <a
+                  href={driveStatus.spreadsheet_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
+                  title="Buka Google Spreadsheet di tab baru"
+                >
+                  <ExternalLink size={18} /> Buka Sheet
+                </a>
+              )}
             </div>
           </div>
 
+          {driveResult && (
+            <div className={`p-4 rounded-xl flex items-center justify-between gap-3 ${driveResult.isError ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-800' : 'bg-emerald-50 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'}`}>
+              <div className="flex items-center gap-3">
+                {driveResult.isError ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
+                <span className="font-medium text-sm">{driveResult.message}</span>
+              </div>
+              {driveResult.link && (
+                <a 
+                  href={driveResult.link} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="flex items-center gap-1 text-sm font-semibold underline hover:no-underline"
+                >
+                  Lihat di Drive <ExternalLink size={16} />
+                </a>
+              )}
+            </div>
+          )}
+
           {loading ? (
-            <div className="text-center py-12 text-gray-500">Loading data...</div>
+            <div className="space-y-4">
+              <CardsSkeleton label="Memuat laporan" />
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                <table className="w-full"><tbody><RowsSkeleton colSpan={1} /></tbody></table>
+              </div>
+            </div>
       ) : report ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-4 transition-colors">
-              <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400">
-                <Users size={24} />
+          <dl className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              ['Total pelanggan', report.total_customers, ''],
+              ['Sudah bayar', report.sudah_bayar, ''],
+              ['Belum bayar', report.belum_bayar, 'text-red-700 dark:text-red-400'],
+              ['Total pendapatan', formatRupiah(report.total_pendapatan), 'col-span-2 lg:col-span-1'],
+            ].map(([label, value, extra]) => (
+              <div key={label} className={`rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 ${extra.startsWith('col') ? extra : ''}`}>
+                <dt className="text-sm text-gray-600 dark:text-gray-400">{label}</dt>
+                <dd className={`text-xl md:text-2xl font-bold mt-1 break-words ${extra.startsWith('text') ? extra : 'text-gray-900 dark:text-white'}`}>{value}</dd>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1 truncate">Total Pelanggan</p>
-                <p className="text-xl xl:text-2xl font-bold text-gray-800 dark:text-white truncate">{report.total_customers}</p>
-              </div>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-4 transition-colors">
-              <div className="p-4 rounded-xl bg-green-50 dark:bg-green-900/30 text-green-500 dark:text-green-400">
-                <CheckCircle size={24} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1 truncate">Sudah Bayar</p>
-                <p className="text-xl xl:text-2xl font-bold text-gray-800 dark:text-white truncate">{report.sudah_bayar}</p>
-              </div>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-4 transition-colors">
-              <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400">
-                <XCircle size={24} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1 truncate">Belum Bayar</p>
-                <p className="text-xl xl:text-2xl font-bold text-gray-800 dark:text-white truncate">{report.belum_bayar}</p>
-              </div>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-4 transition-colors">
-              <div className="p-4 rounded-xl bg-purple-50 dark:bg-purple-900/30 text-purple-500 dark:text-purple-400">
-                <DollarSign size={24} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1 truncate">Total Pendapatan</p>
-                <p className="text-xl xl:text-2xl font-bold text-gray-800 dark:text-white truncate" title={formatRupiah(report.total_pendapatan)}>{formatRupiah(report.total_pendapatan)}</p>
-              </div>
-            </div>
-          </div>
+            ))}
+          </dl>
 
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-colors">
             <div className="flex border-b border-gray-100 dark:border-gray-700">
@@ -376,11 +467,11 @@ Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
             
             <div className="overflow-x-auto">
               {bulananTab === 'sudah' ? (
-                <table className="w-full text-left whitespace-nowrap">
-                  <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-sm">
+                <table className="table-stack w-full text-left whitespace-nowrap">
+                  <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400 text-sm">
                     <tr>
-                      <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Tanggal</th>
                       <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Pelanggan</th>
+                      <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Tanggal</th>
                       <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Nominal</th>
                       <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700 text-center">Cetak</th>
                     </tr>
@@ -391,14 +482,14 @@ Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
                     ) : (
                       filteredPayments.map(p => (
                         <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                          <td className="p-4 text-gray-800 dark:text-gray-200">{p.payment_date}</td>
-                          <td className="p-4 text-gray-800 dark:text-white font-medium">{p.customer?.name}</td>
-                          <td className="p-4 text-green-600 dark:text-green-400 font-medium">{formatRupiah(p.amount)}</td>
-                          <td className="p-4 text-center">
+                          <td data-primary className="p-4 text-gray-900 dark:text-white font-semibold">{p.customer?.name}</td>
+                          <td data-label="Tanggal" className="p-4 text-gray-800 dark:text-gray-200">{p.payment_date}</td>
+                          <td data-label="Nominal" className="p-4 text-green-800 dark:text-green-400 font-medium">{formatRupiah(p.amount)}</td>
+                          <td data-label="Nota" className="p-4 text-center">
                             <button 
                               onClick={() => setReceiptData({ ...p, customerName: p.customer?.name })}
                               className="text-primary dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 p-2 rounded-lg transition-colors"
-                              title="Cetak Nota"
+                              title="Cetak nota" aria-label={`Cetak nota ${p.customer?.name}`}
                             >
                               <Printer size={18} />
                             </button>
@@ -409,8 +500,8 @@ Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
                   </tbody>
                 </table>
               ) : (
-                <table className="w-full text-left whitespace-nowrap">
-                  <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-sm">
+                <table className="table-stack w-full text-left whitespace-nowrap">
+                  <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400 text-sm">
                     <tr>
                       <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Pelanggan</th>
                       <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">No. HP</th>
@@ -424,16 +515,16 @@ Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
                     ) : (
                       filteredUnpaidCustomers.map(c => (
                         <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                          <td className="p-4 text-gray-800 dark:text-white font-medium">{c.name}</td>
-                          <td className="p-4 text-gray-600 dark:text-gray-300">{c.phone || '-'}</td>
-                          <td className="p-4 text-red-600 dark:text-red-400 font-medium">{formatRupiah(c.monthly_fee)}</td>
-                          <td className="p-4 text-center">
+                          <td data-primary className="p-4 text-gray-900 dark:text-white font-semibold">{c.name}</td>
+                          <td data-label="No. HP" className="p-4 text-gray-700 dark:text-gray-300">{c.phone || '-'}</td>
+                          <td data-label="Tagihan" className="p-4 text-red-700 dark:text-red-400 font-medium">{formatRupiah(c.monthly_fee)}</td>
+                          <td data-label="Kirim tagihan" className="p-4 text-center">
                             <button 
                               onClick={() => handleSendWAMonthly(c)}
-                              className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 p-2 rounded-lg transition-colors flex items-center justify-center mx-auto gap-2 text-sm font-medium"
-                              title="Kirim Tagihan WA"
+                              className="text-green-800 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 p-2 rounded-lg transition-colors flex items-center justify-center mx-auto gap-2 text-sm font-medium"
+                              title="Kirim tagihan via WhatsApp" aria-label={`Kirim tagihan WhatsApp ke ${c.name}`}
                             >
-                              <MessageCircle size={16} /> WA
+                              <MessageCircle size={16} />
                             </button>
                           </td>
                         </tr>
@@ -454,37 +545,42 @@ Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
           <div className="flex flex-col sm:flex-row justify-between gap-4 mb-2">
             <input
               type="text"
-              placeholder="Cari nama pelanggan..."
+              placeholder="Cari nama pelanggan"
               value={yearlySearchTerm}
               onChange={(e) => {
                 setYearlySearchTerm(e.target.value);
                 setYearlyCurrentPage(1);
               }}
-              className="flex-1 px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white max-w-md"
+              aria-label="Cari nama pelanggan" className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white sm:max-w-md"
             />
-            <div className="flex justify-end gap-4">
+            <div className="flex flex-wrap gap-2">
               <input 
                 type="number" 
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
-                className="px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white w-32"
+                aria-label="Tahun laporan" className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white w-28"
                 min="2020" max="2100"
               />
-              <button onClick={handleExportYearly} className="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors">
-                <Download size={20} /> Export Excel
+              <button onClick={handleExportYearly} className="bg-primary hover:bg-[#014a85] text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors">
+                <Download size={18} /> Export Excel
               </button>
             </div>
           </div>
           
           {yearlyLoading ? (
-            <div className="text-center py-12 text-gray-500">Loading data...</div>
+            <div className="space-y-4">
+              <CardsSkeleton label="Memuat laporan" />
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                <table className="w-full"><tbody><RowsSkeleton colSpan={1} /></tbody></table>
+              </div>
+            </div>
           ) : (
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-colors">
               <div className="overflow-x-auto">
                 <table className="w-full text-left whitespace-nowrap text-sm">
                   <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400">
                     <tr>
-                      <th className="p-4 font-medium border-b border-gray-100 dark:border-gray-700">Pelanggan</th>
+                      <th className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900 p-4 font-medium border-b border-gray-100 dark:border-gray-700">Pelanggan</th>
                       {monthNames.map(m => (
                         <th key={m} className="p-4 font-medium border-b border-gray-100 dark:border-gray-700 text-center">{m}</th>
                       ))}
@@ -493,13 +589,13 @@ Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                     {paginatedYearlyData.length === 0 ? (
-                      <tr><td colSpan="14" className="p-4 text-center text-gray-500 dark:text-gray-400">Tidak ada data pelanggan aktif</td></tr>
+                      <tr><td colSpan="14" className="p-6 text-center text-gray-600 dark:text-gray-400">Tidak ada pelanggan aktif yang cocok.</td></tr>
                     ) : (
                       paginatedYearlyData.map(c => {
                         const arrears = calculateYearlyArrears(c);
                         return (
                           <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                            <td className="p-4 text-gray-800 dark:text-white font-medium">{c.name}</td>
+                            <td className="sticky left-0 z-10 bg-white dark:bg-gray-800 p-4 text-gray-900 dark:text-white font-medium">{c.name}</td>
                             {monthsList.map(m => (
                               <td key={m} className="p-4 text-center">
                                 {renderMatrixCell(c, m)}
@@ -508,17 +604,17 @@ Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
                             <td className="p-4 text-right">
                               {arrears > 0 ? (
                                 <div className="flex items-center justify-end gap-3">
-                                  <span className="text-red-600 font-bold">{arrears} bln ({formatRupiah(arrears * c.monthly_fee)})</span>
+                                  <span className="text-red-700 dark:text-red-400 font-bold">{arrears} bln ({formatRupiah(arrears * c.monthly_fee)})</span>
                                   <button
                                     onClick={() => openWaModal(c)}
-                                    className="p-1.5 bg-green-100 text-green-600 hover:bg-green-600 hover:text-white rounded-lg transition-colors"
-                                    title="Pilih Bulan & Kirim Tagihan via WA"
+                                    className="grid place-items-center p-1.5 bg-green-100 text-green-800 hover:bg-green-700 hover:text-white rounded-lg transition-colors"
+                                    title="Pilih bulan dan kirim tagihan via WhatsApp" aria-label={`Pilih bulan dan kirim tagihan WhatsApp ke ${c.name}`}
                                   >
                                     <MessageCircle size={18} />
                                   </button>
                                 </div>
                               ) : (
-                                <span className="text-green-600 font-medium flex items-center justify-end gap-1"><CheckCircle size={14}/> Lunas</span>
+                                <span className="text-green-800 dark:text-green-400 font-medium flex items-center justify-end gap-1"><CheckCircle size={14}/> Lunas</span>
                               )}
                             </td>
                           </tr>
@@ -530,7 +626,7 @@ Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
               </div>
               
               {yearlyTotalPages > 1 && (
-                <div className="p-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
+                <div className="p-4 border-t border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 bg-gray-50 dark:bg-gray-800/50">
                   <span className="text-sm text-gray-500 dark:text-gray-400">
                     Halaman {yearlyCurrentPage} dari {yearlyTotalPages}
                   </span>
@@ -558,11 +654,11 @@ Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
       )}
       
       {waModalData && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full shadow-lg overflow-hidden">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 modal-backdrop" role="dialog" aria-modal="true" aria-label="Kirim tagihan WhatsApp">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full overflow-hidden modal-panel">
             <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-              <h3 className="font-bold text-gray-800 dark:text-white">Kirim Tagihan WA</h3>
-              <button onClick={() => setWaModalData(null)} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+              <h3 className="font-bold text-gray-900 dark:text-white">Kirim tagihan WhatsApp</h3>
+              <button onClick={() => setWaModalData(null)} aria-label="Tutup" className="grid place-items-center size-11 -mr-2 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
                 <XCircle size={20} />
               </button>
             </div>
@@ -572,10 +668,10 @@ Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
               </p>
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {waModalData.unpaidMonths.map(m => (
-                  <label key={m.targetMonth} className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors">
+                  <label key={m.targetMonth} className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors">
                     <input 
                       type="checkbox" 
-                      className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                      className="rounded border-gray-300 text-primary h-5 w-5"
                       checked={waModalData.selectedMonths.includes(m.targetMonth)}
                       onChange={(e) => {
                         if (e.target.checked) {
@@ -600,7 +696,7 @@ Mohon untuk segera melakukan pembayaran. Terima kasih! 🙏`;
               <button 
                 onClick={handleSendWASelected}
                 disabled={waModalData.selectedMonths.length === 0}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg flex items-center gap-2 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-white bg-green-700 hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg flex items-center gap-2 transition-colors"
               >
                 <MessageCircle size={16} /> Kirim Pesan
               </button>
